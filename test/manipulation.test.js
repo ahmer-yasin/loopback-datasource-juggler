@@ -483,123 +483,157 @@ describe('manipulation', function() {
       }).catch(done);
     });
 
-    it('should ignore undefined values on updateAttributes', function(done) {
-      person.updateAttributes({ 'name': 'John', age: undefined },
-        function(err, p) {
-          if (err) return done(err);
-          Person.findById(p.id, function(e, p) {
-            if (e) return done(e);
-            p.name.should.equal('John');
-            p.age.should.equal(15);
-            done();
+    it('should ignore undefined values on updateAttributes/patchAttributes',
+      function(done) {
+        var items =
+          [{ alias: 'updateAttributes', data: { name: 'John', age: undefined }},
+          { alias: 'patchAttributes', data: { name: 'James', age: undefined }}];
+        async.eachSeries(items, function(item, cb) {
+          person[item.alias](item.data, function(err, p) {
+            if (err) return cb(err);
+            Person.findById(p.id, function(e, p) {
+              if (e) return cb(e);
+              p.name.should.equal(item.data.name);
+              p.age.should.equal(15);
+              cb();
+            });
           });
-        });
-    });
+        }, done);
+      });
 
-    it('should ignore unknown attributes when strict: true', function(done) {
+    it('should ignore unknown attributes when strict: true',
+      function(done) {
       // Using {foo: 'bar'} only causes dependent test failures due to the
       // stripping of object properties when in strict mode (ie. {foo: 'bar'}
       // changes to '{}' and breaks other tests
-      person.updateAttributes({ name: 'John', foo: 'bar' },
-        function(err, p) {
-          if (err) return done(err);
-          should.not.exist(p.foo);
-          Person.findById(p.id, function(e, p) {
-            if (e) return done(e);
+        var aliases = ['updateAttributes', 'patchAttributes'];
+        async.eachSeries(aliases, function(alias, cb) {
+          person[alias]({ name: 'John', foo: 'bar' }, function(err, p) {
+            if (err) return cb(err);
             should.not.exist(p.foo);
-            done();
-          });
-        });
-    });
-
-    it('should throw error on unknown attributes when strict: throw', function(done) {
-      Person.definition.settings.strict = 'throw';
-      Person.findById(person.id, function(err, p) {
-        p.updateAttributes({ foo: 'bar' },
-          function(err, p) {
-            should.exist(err);
-            err.name.should.equal('Error');
-            err.message.should.equal('Unknown property: foo');
-            should.not.exist(p);
-            Person.findById(person.id, function(e, p) {
-              if (e) return done(e);
+            Person.findById(p.id, function(e, p) {
+              if (e) return cb(e);
               should.not.exist(p.foo);
-              done();
+              cb();
             });
           });
+        }, done);
       });
-    });
 
-    it('should throw error on unknown attributes when strict: throw', function(done) {
-      Person.definition.settings.strict = 'validate';
-      Person.findById(person.id, function(err, p) {
-        p.updateAttributes({ foo: 'bar' },
-          function(err, p) {
-            should.exist(err);
-            err.name.should.equal('ValidationError');
-            err.message.should.containEql('`foo` is not defined in the model');
-            Person.findById(person.id, function(e, p) {
-              if (e) return done(e);
-              should.not.exist(p.foo);
-              done();
+    it('should throw error on unknown attributes when strict: throw',
+      function(done) {
+        Person.definition.settings.strict = 'throw';
+        Person.findById(person.id, function(err, p) {
+          var aliases = ['updateAttributes', 'patchAttributes'];
+          async.eachSeries(aliases, function(alias, cb) {
+            p[alias]({ foo: 'bar' }, function(err, p) {
+              should.exist(err);
+              err.name.should.equal('Error');
+              err.message.should.equal('Unknown property: foo');
+              should.not.exist(p);
+              Person.findById(person.id, function(e, p) {
+                if (e) return cb(e);
+                should.not.exist(p.foo);
+                cb();
+              });
+            });
+          }, done);
+        });
+      });
+
+    it('should throw error on unknown attributes when strict: throw',
+      function(done) {
+        Person.definition.settings.strict = 'validate';
+        Person.findById(person.id, function(err, p) {
+          var aliases = ['updateAttributes', 'patchAttributes'];
+          async.eachSeries(aliases, function(alias, cb) {
+            p[alias]({ foo: 'bar' }, function(err, p) {
+              should.exist(err);
+              err.name.should.equal('ValidationError');
+              err.message.should.containEql('`foo` is not defined in the model');
+              Person.findById(person.id, function(e, p) {
+                if (e) return cb(e);
+                should.not.exist(p.foo);
+                cb();
+              });
+            });
+          }, done);
+        });
+      });
+
+    it('should allow same id value on updateAttributes/ patchAttributes',
+      function(done) {
+        var items =
+        [{ alias: 'updateAttributes', data: { id: person.id, name: 'John' }},
+        { alias: 'patchAttributes', data: { id: person.id, name: 'James' }}];
+        async.eachSeries(items, function(item, cb) {
+          person[item.alias](item.data, function(err, p) {
+            if (err) return cb(err);
+            Person.findById(p.id, function(e, p) {
+              if (e) return cb(e);
+              p.name.should.equal(item.data.name);
+              p.age.should.equal(15);
+              cb();
             });
           });
+        }, done);
       });
-    });
 
-    it('should allow same id value on updateAttributes', function(done) {
-      person.updateAttributes({ id: person.id, name: 'John' },
-        function(err, p) {
-          if (err) return done(err);
-          Person.findById(p.id, function(e, p) {
-            if (e) return done(e);
-            p.name.should.equal('John');
-            p.age.should.equal(15);
-            done();
-          });
-        });
-    });
-
-    it('should allow same stringified id value on updateAttributes',
+    it('should allow same stringified id value on' +
+      'updateAttributes/patchAttributes',
       function(done) {
         var pid = person.id;
         if (typeof person.id === 'object' || typeof person.id === 'number') {
           // For example MongoDB ObjectId
           pid = person.id.toString();
         }
-        person.updateAttributes({ id: pid, name: 'John' },
-          function(err, p) {
-            if (err) return done(err);
+        var items =
+        [{ alias: 'updateAttributes', data: { id: pid, name: 'John' }},
+        { alias: 'patchAttributes', data: { id: pid, name: 'James' }}];
+        async.eachSeries(items, function(item, cb) {
+          person[item.alias](item.data, function(err, p) {
+            if (err) return cb(err);
             Person.findById(p.id, function(e, p) {
-              if (e) return done(e);
-              p.name.should.equal('John');
+              if (e) return cb(e);
+              p.name.should.equal(item.data.name);
               p.age.should.equal(15);
-              done();
+              cb();
             });
           });
+        }, done);
       });
 
-    it('should fail if an id value is to be changed on updateAttributes',
+    it('should fail if an id value is to be changed on' +
+      'updateAttributes/patchAttributes',
       function(done) {
-        person.updateAttributes({ id: person.id + 1, name: 'John' },
-        function(err, p) {
-          should.exist(err);
-          done();
-        });
+        var aliases = ['updateAttributes', 'patchAttributes'];
+        async.eachSeries(aliases, function(alias, cb) {
+          person[alias]({ id: person.id + 1, name: 'John' },
+          function(err, p) {
+            should.exist(err);
+            cb();
+          });
+        }, done);
       });
 
-    it('should allow model instance on updateAttributes', function(done) {
-      person.updateAttributes(new Person({ 'name': 'John', age: undefined }),
-        function(err, p) {
-          if (err) return done(err);
-          Person.findById(p.id, function(e, p) {
-            if (e) return done(e);
-            p.name.should.equal('John');
-            p.age.should.equal(15);
-            done();
+    it('should allow model instance on updateAttributes/patchAttributes',
+      function(done) {
+        var items =
+        [{ alias: 'updateAttributes', data: { name: 'John', age: undefined }},
+        { alias: 'patchAttributes', data: { name: 'James', age: undefined }}];
+        async.eachSeries(items, function(item, cb) {
+          person[item.alias](new Person(item.data),
+          function(err, p) {
+            if (err) return cb(err);
+            Person.findById(p.id, function(e, p) {
+              if (e) return cb(e);
+              p.name.should.equal(item.data.name);
+              p.age.should.equal(15);
+              cb();
+            });
           });
-        });
-    });
+        }, done);
+      });
 
     it('should allow model instance on updateAttributes (promise variant)', function(done) {
       person.updateAttributes(new Person({ 'name': 'Jane', age: undefined }))
@@ -630,30 +664,43 @@ describe('manipulation', function() {
 
   describe('updateOrCreate', function() {
     it('should preserve properties with dynamic setters on create', function(done) {
-      StubUser.updateOrCreate({ password: 'foo' }, function(err, created) {
-        if (err) return done(err);
-        created.password.should.equal('foo-FOO');
-        StubUser.findById(created.id, function(err, found) {
-          if (err) return done(err);
-          found.password.should.equal('foo-FOO');
-          done();
+      var items =
+      [{ alias: 'updateOrCreate', data: { password: 'foo' }},
+      { alias: 'patchOrCreate', data: { password: 'bar' }}];
+      async.eachSeries(items, function(item, cb) {
+        StubUser[item.alias](item.data, function(err, created) {
+          if (err) return cb(err);
+          var expectedPass = item.data.password + '-' +
+          item.data.password.toUpperCase();
+          created.password.should.equal(expectedPass);
+          StubUser.findById(created.id, function(err, found) {
+            if (err) return cb(err);
+            found.password.should.equal(expectedPass);
+            cb();
+          });
         });
-      });
+      }, done);
     });
 
     it('should preserve properties with dynamic setters on update', function(done) {
       StubUser.create({ password: 'foo' }, function(err, created) {
         if (err) return done(err);
-        var data = { id: created.id, password: 'bar' };
-        StubUser.updateOrCreate(data, function(err, updated) {
-          if (err) return done(err);
-          updated.password.should.equal('bar-BAR');
-          StubUser.findById(created.id, function(err, found) {
-            if (err) return done(err);
-            found.password.should.equal('bar-BAR');
-            done();
+        var items =
+        [{ alias: 'updateOrCreate', data: { id: created.id, password: 'bar' }},
+        { alias: 'patchOrCreate', data: { id: created.id, password: 'baz' }}];
+        async.eachSeries(items, function(item, cb) {
+          StubUser[item.alias](item.data, function(err, updated) {
+            if (err) return cb(err);
+            var expectedPass = item.data.password + '-' +
+            item.data.password.toUpperCase();
+            updated.password.should.equal(expectedPass);
+            StubUser.findById(created.id, function(err, found) {
+              if (err) return cb(err);
+              found.password.should.equal(expectedPass);
+              cb();
+            });
           });
-        });
+        }, done);
       });
     });
 
@@ -667,29 +714,36 @@ describe('manipulation', function() {
             name: 'a-name',
             gender: undefined,
           });
-
-          Person.updateOrCreate(
-            { id: instance.id, name: 'updated name' },
-            function(err, updated) {
-              if (err) return done(err);
-              var result = updated.toObject();
-              result.should.have.properties({
-                id: instance.id,
-                name: 'updated name',
+          var items =
+          [{ alias: 'updateOrCreate', data: { id: instance.id, name: 'updated name1' }},
+          { alias: 'patchOrCreate', data: { id: instance.id, name: 'updated name2' }}];
+          async.eachSeries(items, function(item, cb) {
+            Person[item.alias](
+              item.data,
+              function(err, updated) {
+                if (err) return cb(err);
+                var result = updated.toObject();
+                result.should.have.properties(item.data);
+                should.equal(result.gender, null);
+                cb();
               });
-              should.equal(result.gender, null);
-              done();
-            });
+          }, done);
         });
     });
 
     it('should allow save() of the created instance', function(done) {
-      Person.updateOrCreate(
-        { id: 999 /* a new id */, name: 'a-name' },
-        function(err, inst) {
-          if (err) return done(err);
-          inst.save(done);
-        });
+      var items =
+      [{ alias: 'updateOrCreate', data: { id: 999 /* a new id */, name: 'a-name' }},
+      { alias: 'patchOrCreate', data: { id: 1000 /* a new id */, name: 'a-name' }}];
+      async.eachSeries(items, function(item, cb) {
+        Person[item.alias](
+          item.data,
+          function(err, inst) {
+            if (err) return cb(err);
+            inst.save(cb);
+          });
+      }, done);
+
     });
   });
 
