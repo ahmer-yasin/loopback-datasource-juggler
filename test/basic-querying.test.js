@@ -620,6 +620,165 @@ describe('basic-querying', function () {
   });
 });
 
+describe('updateOrCreate', function() {
+  var db = getSchema();
+  var Todo;
+
+  before(function setUp(done) {
+    Todo = db.define('Todo', {
+      content: String
+    });
+    db.automigrate('Todo', done);
+  });
+  afterEach(function tearDown(done) {
+    db.automigrate(done);
+  });
+
+  context('single model queries', function() {
+    it('creates a model when one does not exist', function(done) {
+      Todo.updateOrCreate({content: 'a'}, function(err, data) {
+        if (err) return done(err);
+
+        should.exist(data);
+        should.exist(data.content);
+        data.content.should.equal('a');
+
+        done();
+      });
+    });
+
+    it('updates a model if it exists', function(done) {
+      Todo.create({content: 'a'}, function(err, todo) {
+        Todo.updateOrCreate({id: 1, content: 'b'}, function(err, data) {
+          if (err) return done(err);
+
+          should.exist(data);
+          should.exist(data.id)
+          data.id.should.equal( 1);
+          should.exist(data.content);
+          data.content.should.equal('b');
+
+          done();
+        });
+      });
+    });
+
+    //TODO - Error cases
+
+  });
+
+  //TODO batch model queries
+  context('model queries with array input', function() {
+    // Array with single model
+    it('creates a single model if it does not exist - single object input without id', function(done) {
+      Todo.updateOrCreate([{content: 'a'}], function(err, data) {
+        if (err) return done(err);
+
+        should.exist(data);
+        should.Assertion(Array.isArray(data));
+        data.length.should.equal(1);
+        data[0].content.should.equal('a');
+
+        done();
+      });
+    });
+
+    /* Test-case for proper implemnetion of bulk updateOrCreate */
+    // it('updates a single model if it exists', function(done) {
+    //   Todo.create({content: 'a'}, function(err, todo) {
+    //     Todo.updateOrCreate([{id: 1, content: 'b'}], function(err, data) {
+    //       if (Array.isArray(err)) return done(err[0]);
+    //       if (err) return done(err[0]);
+
+    //       should.exist(data);
+    //       data.length.should.equal(1);
+    //       data[0].id.should.equal(1);
+    //       data[0].content.should.equal('b');
+
+    //       done();
+    //     });
+    //   });
+    // });
+
+    it('returns an error - single object with id', function(done) {
+      Todo.create({content: 'a'}, function(err, todo) {
+        Todo.updateOrCreate([{id: 1, content: 'b'}], function(err, data) {
+          should.exist(err);
+          err.should.have.property('message', 'updateOrCreate does not support bulk mode or any array input');
+
+          Todo.find(function(err, emptyArray) {
+            if (err) return done(err);
+
+            should.Assertion(Array.isArray(emptyArray));
+            emptyArray.length.should.equal(1);
+
+            done();
+          });
+        });
+      });
+    });
+
+    it('creates a batch of new model instances - multiple objects without id', function(done) {
+      Todo.updateOrCreate([
+        {content: 'a'},
+        {content: 'b'}
+      ],
+      function(err, data) {
+        if (Array.isArray(err)) return done(err[0]);
+        if (err) return done(err);
+
+        should.exist(data);
+        data.length.should.equal(2);
+        data[0].content.should.equal('a');
+        data[1].content.should.equal('b');
+
+        done();
+      });
+    });
+
+    it('returns an error - multiple objects with id ', function(done) {
+      Todo.updateOrCreate([
+        {id: 1, content: 'a'},
+        {id: 2, content: 'b'}
+      ],
+      function(err, data) {
+        should.exist(err);
+        err.message.should.equal('updateOrCreate does not support bulk mode or any array input')
+
+        Todo.find(function(err, emptyArray) {
+          if (err) return done(err);
+
+          should.Assertion(Array.isArray(emptyArray));
+          emptyArray.length.should.equal(0);
+
+          done();
+        });
+      });
+    });
+
+    it('returns an error - multiple object input with AND without id ', function(done) {
+      Todo.updateOrCreate([
+        {content: 'a'},
+        {id: 2, content: 'b'}
+      ],
+      function(err, data) {
+
+        should.exist(err);
+        err.message.should.equal('updateOrCreate does not support bulk mode or any array input')
+
+        Todo.find(function(err, emptyArray) {
+          if (err) return done(err);
+
+          should.Assertion(Array.isArray(emptyArray));
+          emptyArray.length.should.equal(0);
+
+          done();
+        });
+      });
+    });
+  });
+});
+
 describe.skip('queries', function() {
   var Todo;
 
