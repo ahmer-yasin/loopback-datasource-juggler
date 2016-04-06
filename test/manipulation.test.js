@@ -37,7 +37,13 @@ describe('manipulation', function() {
   before(function setupStubUserModel(done) {
     StubUser = db.createModel('StubUser', { password: String }, { forceId: true });
     StubUser.setter.password = function(plain) {
-      this.$password = plain + '-' + plain.toUpperCase();
+      if (plain === null)
+        return;
+      var pos = plain.indexOf('-');
+      // Check that it has not been already hashed
+      if (pos === -1 ||
+      (plain.substr(0, pos).toUpperCase() !== plain.substr(pos + 1, plain.length)))
+        this.$password = plain + '-' + plain.toUpperCase();
     };
     db.automigrate('StubUser', done);
   });
@@ -455,6 +461,22 @@ describe('manipulation', function() {
           if (err) return done(err);
           person = p;
           done();
+        });
+      });
+    });
+
+    it('should have updated password hashed with updateAttribute',
+    function(done) {
+      StubUser.create({ password: 'foo' }, function(err, created) {
+        if (err) return done(err);
+        created.updateAttribute('password', 'test', function(err, created) {
+          if (err) return done(err);
+          created.password.should.equal('test-TEST');
+          StubUser.findById(created.id, function(err, found) {
+            if (err) return done(err);
+            found.password.should.equal('test-TEST');
+            done();
+          });
         });
       });
     });
@@ -930,6 +952,23 @@ describe('manipulation', function() {
             if (err) return done(err);
             postInstance = p;
             done();
+          });
+        });
+      });
+
+      it('should have updated password hashed with replaceAttributes',
+      function(done) {
+        StubUser.create({ password: 'foo' }, function(err, created) {
+          if (err) return done(err);
+          created.replaceAttributes({ password: 'test' }, { validate: false },
+          function(err, created) {
+            if (err) return done(err);
+            created.password.should.equal('test-TEST');
+            StubUser.findById(created.id, function(err, found) {
+              if (err) return done(err);
+              found.password.should.equal('test-TEST');
+              done();
+            });
           });
         });
       });
